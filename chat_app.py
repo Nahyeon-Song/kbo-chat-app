@@ -33,8 +33,8 @@ model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
 model_kwargs =  { 
     "max_tokens": 1024,
-    "temperature": 0.5,
-    "top_p": 0.5
+    "temperature": 1.0,
+    "top_p": 1.0
 }
 
 claude_3_client = ChatBedrock(
