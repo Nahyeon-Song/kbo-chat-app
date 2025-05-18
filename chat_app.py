@@ -141,10 +141,19 @@ async def async_retrieve(retriever, query):
     return await loop.run_in_executor(None, lambda: retriever.invoke(query))
 
 def get_answer(query, retriever, chain):
+    # 비동기 함수를 동기적으로 실행하기 위한 헬퍼 함수
+    def run_async(async_func):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            return loop.run_until_complete(async_func)
+        finally:
+            loop.close()
+    
     try:
-        # 1단계: 검색 수행
+        # 비동기 검색 함수 호출 (동기적 컨텍스트에서)
         print(f"검색 시작 - 타임스탬프: {time.time()}")
-        docs = retriever.invoke(query)
+        docs = run_async(async_retrieve(retriever, query))
         print(f"검색 완료 - 타임스탬프: {time.time()}")
         
         # 검색 결과 확인
