@@ -145,6 +145,7 @@ def get_answer(query, retriever, chain):
         # 검색 결과 확인 및 로깅
         doc_count = len(search_results) if search_results else 0
         print(f"검색 완료 - 문서 수: {doc_count}, 타임스탬프: {time.time()}")
+        print(search_results)
         
         # 검색 결과가 없는 경우
         if not search_results or doc_count == 0:
@@ -172,7 +173,6 @@ def get_answer(query, retriever, chain):
         
         # 스트리밍 응답 처리
         for chunk in doc_chain.stream({"input": query, "context": search_results}):
-            print(f"컨텍스트 문서 수: {len(search_results)}, 타임스탬프: {time.time()}")
             full_response += chunk
             message_placeholder.markdown(full_response + "▌")
         
