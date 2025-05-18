@@ -29,12 +29,12 @@ bedrock_runtime = boto3.client(
     # aws_secret_access_key=st.secrets["aws_secret_access_key"]
 )
 
-model_id = "anthropic.claude-3-sonnet-20240229-v1:0"
+model_id = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
-model_kwargs = { 
+model_kwargs =  { 
     "max_tokens": 1024,
-    "temperature": 0.3,
-    "top_p": 0.25
+    "temperature": 0.5,
+    "top_p": 0.5
 }
 
 claude_3_client = ChatBedrock(
@@ -115,9 +115,9 @@ def initialize_rag():
         vectorstore=vectorstore,
         search_type="mmr",  # MMR 검색 사용
         search_kwargs={
-            "k": 10,  # 검색할 문서 수
+            "k": 8,  # 검색할 문서 수
             "fetch_k": 20,  # 초기 검색 문서 수
-            "lambda_mult": 0.3  # 다양성과 관련성 사이의 균형 (0: 다양성, 1: 관련성)
+            "lambda_mult": 0.8  # 다양성과 관련성 사이의 균형 (0: 다양성, 1: 관련성)
         }
     )
     
