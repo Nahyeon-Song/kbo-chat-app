@@ -139,6 +139,7 @@ def initialize_rag():
 
 def get_answer(query, retriever, chain):
     try:
+        print(query)
         # 1. 명시적인 검색 단계
         print(f"검색 시작 - 타임스탬프: {time.time()}")
         
