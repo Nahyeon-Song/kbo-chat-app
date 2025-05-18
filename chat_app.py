@@ -109,6 +109,9 @@ def initialize_rag():
             metadatas=[doc.metadata]
         )
         final_docs.extend(smaller_docs)
+
+    print(f"\nTotal chunks after splitting: {len(final_docs)}")
+    print(f"Average document size: {sum(len(doc.page_content) for doc in final_docs) / len(final_docs):.0f} characters")
     
     # 임베딩 및 벡터 스토어 설정
     embeddings = BedrockEmbeddings(region_name=region)
