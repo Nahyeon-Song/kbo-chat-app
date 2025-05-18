@@ -62,6 +62,7 @@ system_prompt = (
 def initialize_rag():
     # 문서 로드
     md_files = glob.glob("documents/md/final/*.md")
+    print(f"발견된 마크다운 파일 수: {len(md_files)}")
     
     all_docs = []
     for file_path in md_files:
@@ -69,8 +70,12 @@ def initialize_rag():
             loader = TextLoader(file_path, encoding='utf-8')
             docs = loader.load()
             all_docs.extend(docs)
+            print(f"로드된 파일: {file_path}, 문서 수: {len(docs)}")
         except Exception as e:
+            print(f"파일 로드 오류 {file_path}: {e}")
             st.error(f"Error loading {file_path}: {e}")
+    
+    print(f"총 로드된 문서 수: {len(all_docs)}")
     
     # 마크다운 헤더 정의
     headers_to_split_on = [
@@ -89,6 +94,8 @@ def initialize_rag():
         # 마크다운 헤더 기반으로 분할
         header_splits = markdown_splitter.split_text(doc.page_content)
         all_splits.extend(header_splits)
+    
+    print(f"헤더 기반 분할 후 문서 수: {len(all_splits)}")
     
     # 재귀적 분할 설정
     chunk_size = 750
@@ -110,12 +117,31 @@ def initialize_rag():
         )
         final_docs.extend(smaller_docs)
 
-    print(f"\nTotal chunks after splitting: {len(final_docs)}")
-    print(f"Average document size: {sum(len(doc.page_content) for doc in final_docs) / len(final_docs):.0f} characters")
+    print(f"\n최종 청크 수: {len(final_docs)}")
+    print(f"평균 문서 크기: {sum(len(doc.page_content) for doc in final_docs) / len(final_docs):.0f} 문자")
     
     # 임베딩 및 벡터 스토어 설정
+    print("\n임베딩 시작...")
     embeddings = BedrockEmbeddings(region_name=region)
-    vectorstore=FAISS.from_documents(final_docs, embeddings)
+    
+    # 임베딩 테스트
+    test_text = "KBO 리그 규정"
+    test_embedding = embeddings.embed_query(test_text)
+    print(f"테스트 임베딩 차원: {len(test_embedding)}")
+    print(f"임베딩 샘플: {test_embedding[:5]}...")
+    
+    print("\n벡터 스토어 생성 중...")
+    vectorstore = FAISS.from_documents(final_docs, embeddings)
+    print(f"벡터 스토어 생성 완료, 인덱스 크기: {vectorstore.index.ntotal}")
+    
+    # 검색 테스트
+    test_query = "외국인 선수 등록"
+    print(f"\n테스트 쿼리로 검색: '{test_query}'")
+    test_results = vectorstore.similarity_search(test_query, k=2)
+    print(f"검색 결과 수: {len(test_results)}")
+    for i, doc in enumerate(test_results):
+        print(f"결과 {i+1} 미리보기: {doc.page_content[:100]}...")
+    
     retriever = VectorStoreRetriever(
         vectorstore=vectorstore,
         search_type="mmr",  # MMR 검색 사용
@@ -125,6 +151,13 @@ def initialize_rag():
             "lambda_mult": 0.8  # 다양성과 관련성 사이의 균형 (0: 다양성, 1: 관련성)
         }
     )
+    
+    # 리트리버 테스트
+    print(f"\n리트리버로 테스트 쿼리 검색: '{test_query}'")
+    retriever_results = retriever.invoke(test_query)
+    print(f"리트리버 결과 수: {len(retriever_results)}")
+    for i, doc in enumerate(retriever_results):
+        print(f"리트리버 결과 {i+1} 미리보기: {doc.page_content[:100]}...")
     
     # Chain 설정
     prompt = ChatPromptTemplate.from_messages([
@@ -139,9 +172,8 @@ def initialize_rag():
 
 def get_answer(query, retriever, chain):
     try:
-        print(query)
         # 1. 명시적인 검색 단계
-        print(f"검색 시작 - 타임스탬프: {time.time()}")
+        print(f"검색 시작 - 타임스탬프: {time.time()}, 쿼리: '{query}'")
         
         # 검색 결과를 변수에 확실히 저장
         search_results = retriever.invoke(query)
@@ -149,7 +181,14 @@ def get_answer(query, retriever, chain):
         # 검색 결과 확인 및 로깅
         doc_count = len(search_results) if search_results else 0
         print(f"검색 완료 - 문서 수: {doc_count}, 타임스탬프: {time.time()}")
-        print(search_results)
+        
+        # 검색된 문서 내용 상세 출력
+        for i, doc in enumerate(search_results):
+            print(f"문서 {i+1}:")
+            print(f"  내용 미리보기: {doc.page_content[:150]}...")
+            print(f"  메타데이터: {doc.metadata}")
+            if hasattr(doc, 'score'):
+                print(f"  유사도 점수: {doc.score}")
         
         # 검색 결과가 없는 경우
         if not search_results or doc_count == 0:
@@ -165,6 +204,9 @@ def get_answer(query, retriever, chain):
             ("system", system_prompt),
             ("human", "{input}"),
         ])
+
+        print(query)
+        print(prompt)
         
         # 문서 체인 생성 (검색 결과를 직접 전달)
         doc_chain = create_stuff_documents_chain(claude_3_client, prompt)
