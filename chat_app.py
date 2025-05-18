@@ -136,27 +136,37 @@ def get_answer(query, retriever, chain):
     # 검색 결과를 명시적으로 완료하고 변수에 저장
     docs = retriever.invoke(query)
     
+    # 디버깅을 위한 로깅 추가
+    st.session_state.debug_info = f"검색된 문서 수: {len(docs)}"
+    print(f"EC2/로컬 디버깅 - 검색된 문서 수: {len(docs)}")
+    
     # 검색 결과가 없는 경우 처리
     if not docs:
         return "죄송합니다. 해당 내용은 KBO 리그 규정에서 찾을 수 없습니다."
     
-    # 검색된 문서를 사용하여 새 입력 생성
-    chain_input = {"input": query, "context": docs}
-    
-    # 스트리밍을 위한 빈 컨테이너 생성
-    message_placeholder = st.empty()
-    full_response = ""
-    
-    # 스트리밍 응답 처리 - 명시적으로 검색 결과를 포함한 입력 사용
-    for chunk in chain.stream(chain_input):
-        if "answer" in chunk:
-            full_response += chunk["answer"]
-            # 현재까지의 응답을 표시
-            message_placeholder.markdown(full_response + "▌")
-    
-    # 최종 응답 표시 (커서 제거)
-    message_placeholder.markdown(full_response)
-    return full_response
+    try:
+        # 검색된 문서를 사용하여 새 입력 생성
+        chain_input = {"input": query}
+        
+        # 스트리밍을 위한 빈 컨테이너 생성
+        message_placeholder = st.empty()
+        full_response = ""
+        
+        # 스트리밍 응답 처리 - retrieval_chain은 자체적으로 문서를 처리함
+        for chunk in chain.stream(chain_input):
+            if "answer" in chunk:
+                full_response += chunk["answer"]
+                # 현재까지의 응답을 표시
+                message_placeholder.markdown(full_response + "▌")
+        
+        # 최종 응답 표시 (커서 제거)
+        message_placeholder.markdown(full_response)
+        return full_response
+    except Exception as e:
+        error_msg = f"오류 발생: {str(e)}"
+        print(error_msg)
+        st.error(error_msg)
+        return f"응답 생성 중 오류가 발생했습니다: {str(e)}"
 
 # Streamlit UI
 st.title("KBO 리그 규정 문의")
