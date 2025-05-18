@@ -25,6 +25,8 @@ region = "us-east-1"  # 사용하는 리전으로 변경
 bedrock_runtime = boto3.client(
     service_name="bedrock-runtime",
     region_name=region,
+    aws_access_key_id=st.secrets["aws_access_key_id"],
+    aws_secret_access_key=st.secrets["aws_secret_access_key"]
 )
 
 model_id = "anthropic.claude-3-sonnet-20240229-v1:0"
