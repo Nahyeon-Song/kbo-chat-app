@@ -141,43 +141,41 @@ async def async_retrieve(retriever, query):
     return await loop.run_in_executor(None, lambda: retriever.invoke(query))
 
 def get_answer(query, retriever, chain):
-    # 동기화를 위한 시간 지연 추가
-    time.sleep(0.5)  # 0.5초 지연으로 검색 결과가 완전히 준비되도록 함
-    
-    # 검색 결과를 명시적으로 완료하고 변수에 저장
     try:
-        # 동기 방식으로 검색 실행 (asyncio 사용 불가능한 경우)
+        # 1단계: 검색 수행
+        print(f"검색 시작 - 타임스탬프: {time.time()}")
         docs = retriever.invoke(query)
+        print(f"검색 완료 - 타임스탬프: {time.time()}")
         
-        # 디버깅을 위한 로깅 추가
+        # 검색 결과 확인
         doc_count = len(docs) if docs else 0
-        st.session_state.debug_info = f"검색된 문서 수: {doc_count}"
-        print(f"EC2/로컬 디버깅 - 검색된 문서 수: {doc_count}, 타임스탬프: {time.time()}")
+        print(f"검색된 문서 수: {doc_count}")
         
-        # 검색 결과가 없는 경우 처리
         if not docs or doc_count == 0:
             return "죄송합니다. 해당 내용은 KBO 리그 규정에서 찾을 수 없습니다."
         
-        # 검색된 문서 내용 확인 (디버깅용)
-        for i, doc in enumerate(docs):
-            print(f"문서 {i+1} 미리보기: {doc.page_content[:100]}...")
-        
-        # 스트리밍을 위한 빈 컨테이너 생성
+        # 스트리밍 컨테이너 준비
         message_placeholder = st.empty()
-        full_response = ""
-        
-        # 응답 생성 시작 표시
         message_placeholder.markdown("검색 완료, 응답 생성 중..." + "▌")
-        time.sleep(0.5)  # 응답 생성 전 추가 지연
+        
+        # 2단계: 직접 문서를 전달하여 응답 생성
+        # 검색 결과를 직접 전달하는 새로운 체인 생성
+        from langchain.chains.combine_documents import create_stuff_documents_chain
+        
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", system_prompt),
+            ("human", "{input}"),
+        ])
+        
+        # 문서를 직접 전달하는 체인 생성
+        doc_chain = create_stuff_documents_chain(claude_3_client, prompt)
         
         # 스트리밍 응답 처리
-        for chunk in chain.stream({"input": query}):
-            if "answer" in chunk:
-                full_response += chunk["answer"]
-                # 현재까지의 응답을 표시
-                message_placeholder.markdown(full_response + "▌")
+        full_response = ""
+        for chunk in doc_chain.stream({"input": query, "context": docs}):
+            full_response += chunk
+            message_placeholder.markdown(full_response + "▌")
         
-        # 최종 응답 표시 (커서 제거)
         message_placeholder.markdown(full_response)
         return full_response
         
