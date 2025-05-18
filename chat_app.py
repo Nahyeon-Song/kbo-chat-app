@@ -12,6 +12,7 @@ from langchain.chains import create_retrieval_chain
 from langchain_aws import ChatBedrock
 import asyncio
 import time
+import os
 
 import glob
 
@@ -60,13 +61,23 @@ system_prompt = (
 
 @st.cache_resource
 def initialize_rag():
-    # 문서 로드
-    md_files = glob.glob("documents/md/final/*.md")
-    print(f"발견된 마크다운 파일 수: {len(md_files)}")
+    # 문서를 명시적인 순서로 로드
+    md_files = [
+        "documents/md/final/2025_리그규정_cleaned_header.md",
+        "documents/md/final/crop_2025_야구규칙.md"
+    ]
+    
+    print(f"로드할 마크다운 파일 수: {len(md_files)}")
+    
+    # 파일 존재 여부 확인
+    for file_path in md_files:
+        if not os.path.exists(file_path):
+            print(f"경고: 파일이 존재하지 않습니다 - {file_path}")
     
     all_docs = []
     for file_path in md_files:
         try:
+            print(f"파일 로드 중: {file_path}")
             loader = TextLoader(file_path, encoding='utf-8')
             docs = loader.load()
             all_docs.extend(docs)
