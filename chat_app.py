@@ -142,7 +142,8 @@ def initialize_rag():
     print(f"임베딩 샘플: {test_embedding[:5]}...")
     
     print("\n벡터 스토어 생성 중...")
-    vectorstore = FAISS.from_documents(final_docs, embeddings)
+    # vectorstore = FAISS.from_documents(final_docs, embeddings)
+    vectorstore = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     print(f"벡터 스토어 생성 완료, 인덱스 크기: {vectorstore.index.ntotal}")
     
     # 검색 테스트
