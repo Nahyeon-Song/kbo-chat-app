@@ -133,7 +133,7 @@ def initialize_rag():
     
     # 임베딩 및 벡터 스토어 설정
     print("\n임베딩 시작...")
-    embeddings = BedrockEmbeddings(region_name=region)
+    embeddings = BedrockEmbeddings(region_name=region, model_id="amazon.titan-embed-text-v1")
     
     # 임베딩 테스트
     test_text = "KBO 리그 규정"
