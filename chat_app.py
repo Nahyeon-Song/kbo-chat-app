@@ -10,6 +10,8 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.chains import create_retrieval_chain
 from langchain_aws import ChatBedrock
+import asyncio
+import time
 
 import glob
 
@@ -132,28 +134,44 @@ def initialize_rag():
     
     return chain, retriever
 
+# 비동기 처리를 위한 함수
+async def async_retrieve(retriever, query):
+    # 비동기 환경에서 동기 함수 실행
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, lambda: retriever.invoke(query))
+
 def get_answer(query, retriever, chain):
+    # 동기화를 위한 시간 지연 추가
+    time.sleep(0.5)  # 0.5초 지연으로 검색 결과가 완전히 준비되도록 함
+    
     # 검색 결과를 명시적으로 완료하고 변수에 저장
-    docs = retriever.invoke(query)
-    
-    # 디버깅을 위한 로깅 추가
-    st.session_state.debug_info = f"검색된 문서 수: {len(docs)}"
-    print(f"EC2/로컬 디버깅 - 검색된 문서 수: {len(docs)}")
-    
-    # 검색 결과가 없는 경우 처리
-    if not docs:
-        return "죄송합니다. 해당 내용은 KBO 리그 규정에서 찾을 수 없습니다."
-    
     try:
-        # 검색된 문서를 사용하여 새 입력 생성
-        chain_input = {"input": query}
+        # 동기 방식으로 검색 실행 (asyncio 사용 불가능한 경우)
+        docs = retriever.invoke(query)
+        
+        # 디버깅을 위한 로깅 추가
+        doc_count = len(docs) if docs else 0
+        st.session_state.debug_info = f"검색된 문서 수: {doc_count}"
+        print(f"EC2/로컬 디버깅 - 검색된 문서 수: {doc_count}, 타임스탬프: {time.time()}")
+        
+        # 검색 결과가 없는 경우 처리
+        if not docs or doc_count == 0:
+            return "죄송합니다. 해당 내용은 KBO 리그 규정에서 찾을 수 없습니다."
+        
+        # 검색된 문서 내용 확인 (디버깅용)
+        for i, doc in enumerate(docs):
+            print(f"문서 {i+1} 미리보기: {doc.page_content[:100]}...")
         
         # 스트리밍을 위한 빈 컨테이너 생성
         message_placeholder = st.empty()
         full_response = ""
         
-        # 스트리밍 응답 처리 - retrieval_chain은 자체적으로 문서를 처리함
-        for chunk in chain.stream(chain_input):
+        # 응답 생성 시작 표시
+        message_placeholder.markdown("검색 완료, 응답 생성 중..." + "▌")
+        time.sleep(0.5)  # 응답 생성 전 추가 지연
+        
+        # 스트리밍 응답 처리
+        for chunk in chain.stream({"input": query}):
             if "answer" in chunk:
                 full_response += chunk["answer"]
                 # 현재까지의 응답을 표시
@@ -162,6 +180,7 @@ def get_answer(query, retriever, chain):
         # 최종 응답 표시 (커서 제거)
         message_placeholder.markdown(full_response)
         return full_response
+        
     except Exception as e:
         error_msg = f"오류 발생: {str(e)}"
         print(error_msg)
