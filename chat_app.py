@@ -134,57 +134,49 @@ def initialize_rag():
     
     return chain, retriever
 
-# 비동기 처리를 위한 함수
-async def async_retrieve(retriever, query):
-    # 비동기 환경에서 동기 함수 실행
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, lambda: retriever.invoke(query))
-
 def get_answer(query, retriever, chain):
-    # 비동기 함수를 동기적으로 실행하기 위한 헬퍼 함수
-    def run_async(async_func):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            return loop.run_until_complete(async_func)
-        finally:
-            loop.close()
-    
     try:
-        # 비동기 검색 함수 호출 (동기적 컨텍스트에서)
+        # 1. 명시적인 검색 단계
         print(f"검색 시작 - 타임스탬프: {time.time()}")
-        docs = run_async(async_retrieve(retriever, query))
-        print(f"검색 완료 - 타임스탬프: {time.time()}")
         
-        # 검색 결과 확인
-        doc_count = len(docs) if docs else 0
-        print(f"검색된 문서 수: {doc_count}")
+        # 검색 결과를 변수에 확실히 저장
+        search_results = retriever.invoke(query)
         
-        if not docs or doc_count == 0:
+        # 검색 결과 확인 및 로깅
+        doc_count = len(search_results) if search_results else 0
+        print(f"검색 완료 - 문서 수: {doc_count}, 타임스탬프: {time.time()}")
+        
+        # 검색 결과가 없는 경우
+        if not search_results or doc_count == 0:
             return "죄송합니다. 해당 내용은 KBO 리그 규정에서 찾을 수 없습니다."
         
-        # 스트리밍 컨테이너 준비
+        # 2. UI 업데이트
         message_placeholder = st.empty()
         message_placeholder.markdown("검색 완료, 응답 생성 중..." + "▌")
         
-        # 2단계: 직접 문서를 전달하여 응답 생성
-        # 검색 결과를 직접 전달하는 새로운 체인 생성
-        from langchain.chains.combine_documents import create_stuff_documents_chain
-        
+        # 3. 검색 결과를 명시적으로 전달하는 새로운 체인 생성
+        # 기존 체인을 재사용하지 않고 새로운 체인 생성
         prompt = ChatPromptTemplate.from_messages([
             ("system", system_prompt),
             ("human", "{input}"),
         ])
         
-        # 문서를 직접 전달하는 체인 생성
+        # 문서 체인 생성 (검색 결과를 직접 전달)
         doc_chain = create_stuff_documents_chain(claude_3_client, prompt)
         
-        # 스트리밍 응답 처리
+        # 4. 응답 생성 (검색 결과를 직접 전달)
+        print(f"응답 생성 시작 - 타임스탬프: {time.time()}")
+        
+        # 검색 결과를 명시적으로 컨텍스트에 포함
         full_response = ""
-        for chunk in doc_chain.stream({"input": query, "context": docs}):
+        
+        # 스트리밍 응답 처리
+        for chunk in doc_chain.stream({"input": query, "context": search_results}):
+            print(f"컨텍스트 문서 수: {len(search_results)}, 타임스탬프: {time.time()}")
             full_response += chunk
             message_placeholder.markdown(full_response + "▌")
         
+        print(f"응답 생성 완료 - 타임스탬프: {time.time()}")
         message_placeholder.markdown(full_response)
         return full_response
         
